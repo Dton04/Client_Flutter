@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/user_profile_model.dart';
 import '../../services/profile_service.dart';
+import '../../services/auth_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/metric_card.dart';
+import 'edit_profile_screen.dart';
+import 'body_metrics_screen.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -54,8 +58,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Hồ sơ cá nhân'),
         actions: [
           TextButton(
-            onPressed: () {
-              // TODO: Navigate to edit profile
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      EditProfileScreen(userProfile: _userProfile!),
+                ),
+              );
+              if (result == true) {
+                _loadUserProfile();
+              }
             },
             child: const Text(
               'Sửa',
@@ -91,6 +104,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Body Metrics
                   _buildBodyMetrics(),
 
+                  const SizedBox(height: 12),
+
+                  // Update Metrics Button
+                  _buildUpdateMetricsButton(),
+
                   const SizedBox(height: AppConstants.paddingLarge),
 
                   // Fitness Goal
@@ -105,6 +123,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // Training Settings
                   _buildTrainingSettings(),
+
+                  const SizedBox(height: AppConstants.paddingLarge),
+
+                  // Logout Button
+                  _buildLogoutButton(),
                 ],
               ),
             ),
@@ -219,8 +242,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: double.infinity,
       height: 48,
       child: OutlinedButton.icon(
-        onPressed: () {
-          // TODO: Navigate to edit profile
+        onPressed: () async {
+          if (_userProfile != null) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    EditProfileScreen(userProfile: _userProfile!),
+              ),
+            );
+            if (result == true) {
+              _loadUserProfile();
+            }
+          }
         },
         icon: const Icon(Icons.edit_outlined),
         label: const Text('Chỉnh sửa hồ sơ'),
@@ -595,6 +629,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
             size: 20,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUpdateMetricsButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const BodyMetricsScreen()),
+          );
+          if (result == true) {
+            _loadUserProfile();
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Cập nhật chỉ số cơ thể'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppConstants.primaryColor,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              AppConstants.borderRadiusMedium,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: AppConstants.cardColor,
+              title: const Text(
+                'Đăng xuất',
+                style: TextStyle(
+                  color: AppConstants.textPrimaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: const Text(
+                'Bạn có chắc chắn muốn đăng xuất?',
+                style: TextStyle(color: AppConstants.textSecondaryColor),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Hủy',
+                    style: TextStyle(color: AppConstants.textSecondaryColor),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    // Close dialog
+                    Navigator.pop(context);
+
+                    // Logout
+                    await AuthService.logout();
+
+                    // Navigate to login screen and clear navigation stack
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppConstants.errorColor,
+                  ),
+                  child: const Text(
+                    'Đăng xuất',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        icon: const Icon(Icons.logout),
+        label: const Text('Đăng xuất'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppConstants.errorColor,
+          side: const BorderSide(color: AppConstants.errorColor),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              AppConstants.borderRadiusMedium,
+            ),
+          ),
+        ),
       ),
     );
   }

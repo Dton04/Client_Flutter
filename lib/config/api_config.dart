@@ -25,9 +25,15 @@ class ApiConfig {
   static String get resetPasswordUrl => '$baseUrl$resetPassword';
   static String get changePasswordUrl => '$baseUrl$changePassword';
 
+  // Upload endpoints
+  static const String uploadImage = '/upload/image';
+
   // User & Profile endpoints
   static const String userProfile = '/users/profile';
   static const String bodyMetrics = '/users/body-metrics';
+
+  // Upload Full URLs
+  static String get uploadImageUrl => '$baseUrl$uploadImage';
 
   // User & Profile Full URLs
   static String get userProfileUrl => '$baseUrl$userProfile';
@@ -41,6 +47,12 @@ class ApiConfig {
 
   static Map<String, String> headersWithToken(String token) => {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+
+  // Headers for multipart requests (no Content-Type, let http package set it)
+  static Map<String, String> headersWithTokenNoContentType(String token) => {
     'Accept': 'application/json',
     'Authorization': 'Bearer $token',
   };

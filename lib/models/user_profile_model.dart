@@ -28,18 +28,21 @@ class UserProfileModel {
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
+    // Parse metrics object if it exists
+    final metrics = json['metrics'] as Map<String, dynamic>?;
+
     return UserProfileModel(
       userId: json['user_id'] as int,
       fullName: json['full_name'] as String,
       email: json['email'] as String,
       avatarUrl: json['avatar_url'] as String?,
       gender: json['gender'] as String?,
-      fitnessGoal: json['fitness_goal'] as String?,
-      weight: json['weight'] != null
-          ? (json['weight'] as num).toDouble()
+      fitnessGoal: metrics?['fitness_goal'] as String?,
+      weight: metrics?['weight'] != null
+          ? (metrics!['weight'] as num).toDouble()
           : null,
-      height: json['height'] != null
-          ? (json['height'] as num).toDouble()
+      height: metrics?['height'] != null
+          ? (metrics!['height'] as num).toDouble()
           : null,
       age: json['age'] as int?,
       bmi: json['bmi'] != null ? (json['bmi'] as num).toDouble() : null,
@@ -48,6 +51,8 @@ class UserProfileModel {
           : null,
       joinedAt: json['joined_at'] != null
           ? DateTime.parse(json['joined_at'] as String)
+          : json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : null,
     );
   }
