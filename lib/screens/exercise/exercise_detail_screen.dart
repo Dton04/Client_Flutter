@@ -278,8 +278,8 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                         onPressed: () async {
                           try {
                             final Uri url = Uri.parse(videoMedia.url);
-                            // Mở video bằng ứng dụng ngoài (Youtube, Browser, Player)
-                            if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                            // Mở video trong ứng dụng (In-App Browser)
+                            if (!await launchUrl(url, mode: LaunchMode.inAppWebView)) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Không thể mở video này')),

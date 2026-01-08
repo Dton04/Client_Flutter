@@ -8,7 +8,8 @@ class ApiConfig {
     // return 'http://192.168.1.100:7979/api/v1';
 
     // For emulator/simulator
-    return 'http://10.0.2.2:7979/api/v1';
+    //return 'http://10.0.2.2:7979/api/v1';
+    return 'http://26.45.246.74:7979/api/v1';
   }
 
   // Image Base URL (Root of the server)
