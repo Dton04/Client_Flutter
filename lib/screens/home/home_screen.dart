@@ -5,6 +5,9 @@ import '../../utils/constants.dart';
 import '../../widgets/bottom_nav_bar.dart';
 import '../../widgets/stat_card.dart';
 import '../profile/profile_screen.dart';
+import '../exercise/exercise_list_screen.dart';
+import '../plan/plan_list_screen.dart';
+import '../plan/create_plan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,7 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onNavTap(int index) {
-    if (index == 4) {
+    if (index == 2) {
+      // Create Plan Button
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const CreatePlanScreen()),
+      ).then((_) {
+        // Refresh if needed
+      });
+    } else if (index == 4) {
       // Navigate to Profile screen
       Navigator.push(
         context,
@@ -59,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _currentNavIndex = index;
       });
-      // TODO: Handle other navigation items
     }
   }
 
@@ -68,50 +78,67 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppConstants.backgroundColor,
       body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: AppConstants.primaryColor,
-                ),
-              )
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(AppConstants.paddingLarge),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    _buildHeader(),
-
-                    const SizedBox(height: AppConstants.paddingLarge),
-
-                    // Stats Cards
-                    _buildStatsCards(),
-
-                    const SizedBox(height: AppConstants.paddingLarge),
-
-                    // Today's Focus
-                    _buildTodaysFocus(),
-
-                    const SizedBox(height: AppConstants.paddingLarge),
-
-                    // Weekly Goal
-                    _buildWeeklyGoal(),
-
-                    const SizedBox(height: AppConstants.paddingLarge),
-
-                    // Activity
-                    _buildActivity(),
-
-                    const SizedBox(height: 80), // Space for bottom nav
-                  ],
-                ),
-              ),
+        child: _buildBody(),
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentNavIndex,
         onTap: _onNavTap,
       ),
     );
+  }
+
+  Widget _buildBody() {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildHomeContent();
+      case 1:
+        return const ExerciseListScreen();
+      case 3:
+        return const PlanListScreen();
+      default:
+        return _buildHomeContent();
+    }
+  }
+
+  Widget _buildHomeContent() {
+    return _isLoading
+        ? const Center(
+            child: CircularProgressIndicator(
+              color: AppConstants.primaryColor,
+            ),
+          )
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(AppConstants.paddingLarge),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                _buildHeader(),
+
+                const SizedBox(height: AppConstants.paddingLarge),
+
+                // Stats Cards
+                _buildStatsCards(),
+
+                const SizedBox(height: AppConstants.paddingLarge),
+
+                // Today's Focus
+                _buildTodaysFocus(),
+
+                const SizedBox(height: AppConstants.paddingLarge),
+
+                // Weekly Goal
+                _buildWeeklyGoal(),
+
+                const SizedBox(height: AppConstants.paddingLarge),
+
+                // Activity
+                _buildActivity(),
+
+                const SizedBox(height: 80), // Space for bottom nav
+              ],
+            ),
+          );
   }
 
   Widget _buildHeader() {

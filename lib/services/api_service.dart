@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Generic POST request
-  static Future<Map<String, dynamic>> post({
+  static Future<dynamic> post({
     required String url,
     required Map<String, dynamic> body,
     Map<String, String>? headers,
@@ -24,7 +24,7 @@ class ApiService {
   }
 
   // Generic GET request
-  static Future<Map<String, dynamic>> get({
+  static Future<dynamic> get({
     required String url,
     Map<String, String>? headers,
   }) async {
@@ -43,7 +43,7 @@ class ApiService {
   }
 
   // Generic PUT request
-  static Future<Map<String, dynamic>> put({
+  static Future<dynamic> put({
     required String url,
     required Map<String, dynamic> body,
     Map<String, String>? headers,
@@ -64,7 +64,7 @@ class ApiService {
   }
 
   // Generic DELETE request
-  static Future<Map<String, dynamic>> delete({
+  static Future<dynamic> delete({
     required String url,
     Map<String, String>? headers,
   }) async {
@@ -83,13 +83,13 @@ class ApiService {
   }
 
   // Handle HTTP response
-  static Map<String, dynamic> _handleResponse(http.Response response) {
+  static dynamic _handleResponse(http.Response response) {
     final statusCode = response.statusCode;
 
     // Try to parse response body
-    Map<String, dynamic> responseData;
+    dynamic responseData;
     try {
-      responseData = jsonDecode(response.body) as Map<String, dynamic>;
+      responseData = jsonDecode(response.body);
     } catch (e) {
       responseData = {'message': response.body};
     }
@@ -98,27 +98,30 @@ class ApiService {
     if (statusCode >= 200 && statusCode < 300) {
       // Success
       return responseData;
-    } else if (statusCode == 400) {
-      // Bad request
-      throw Exception(responseData['message'] ?? 'Invalid request');
-    } else if (statusCode == 401) {
-      // Unauthorized
-      throw Exception(responseData['message'] ?? 'Unauthorized');
-    } else if (statusCode == 403) {
-      // Forbidden
-      throw Exception(responseData['message'] ?? 'Access forbidden');
-    } else if (statusCode == 404) {
-      // Not found
-      throw Exception(responseData['message'] ?? 'Resource not found');
-    } else if (statusCode == 409) {
-      // Conflict
-      throw Exception(responseData['message'] ?? 'Resource conflict');
-    } else if (statusCode >= 500) {
-      // Server error
-      throw Exception(responseData['message'] ?? 'Server error');
     } else {
-      // Other errors
-      throw Exception(responseData['message'] ?? 'Unknown error occurred');
+      // Error handling - assuming error response is a Map
+      String errorMessage = 'Unknown error occurred';
+      if (responseData is Map<String, dynamic>) {
+        errorMessage = responseData['message'] ?? errorMessage;
+      } else if (responseData is String) {
+        errorMessage = responseData;
+      }
+
+      if (statusCode == 400) {
+        throw Exception(errorMessage);
+      } else if (statusCode == 401) {
+        throw Exception(errorMessage);
+      } else if (statusCode == 403) {
+        throw Exception(errorMessage);
+      } else if (statusCode == 404) {
+        throw Exception(errorMessage);
+      } else if (statusCode == 409) {
+        throw Exception(errorMessage);
+      } else if (statusCode >= 500) {
+        throw Exception(errorMessage);
+      } else {
+        throw Exception(errorMessage);
+      }
     }
   }
 }
