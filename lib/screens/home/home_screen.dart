@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/user_profile_model.dart';
+import '../../models/dashboard_stats_model.dart';
+import '../../models/workout_history_model.dart';
 import '../../services/profile_service.dart';
+import '../../services/tracking_service.dart';
+import '../../services/workout_plan_service.dart';
 import '../../utils/constants.dart';
 import '../../widgets/bottom_nav_bar.dart';
 import '../../widgets/stat_card.dart';
@@ -8,6 +12,7 @@ import '../profile/profile_screen.dart';
 import '../exercise/exercise_list_screen.dart';
 import '../plan/plan_list_screen.dart';
 import '../plan/create_plan_screen.dart';
+import '../workout/workout_session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,12 +24,95 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
   UserProfileModel? _userProfile;
+  DashboardStatsModel? _dashboardStats;
+  List<WorkoutHistoryModel> _weeklyWorkouts = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfile();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    await Future.wait([
+      _loadUserProfile(),
+      _loadDashboardData(),
+      _loadWeeklyActivity(),
+    ]);
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    await _loadAllData();
+
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+      });
+    }
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final stats = await TrackingService.getDashboardStats();
+      if (mounted) {
+        setState(() {
+          _dashboardStats = stats;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Không thể tải thống kê: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+            backgroundColor: AppConstants.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadWeeklyActivity() async {
+    try {
+      final now = DateTime.now();
+      final workouts = await TrackingService.getWorkoutHistory(
+        month: now.month,
+        year: now.year,
+      );
+
+      // Filter to current week only
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+      final weeklyWorkouts = workouts.where((workout) {
+        return workout.performedAt.isAfter(
+              startOfWeek.subtract(const Duration(days: 1)),
+            ) &&
+            workout.performedAt.isBefore(
+              endOfWeek.add(const Duration(days: 1)),
+            );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _weeklyWorkouts = weeklyWorkouts;
+        });
+      }
+    } catch (e) {
+      // Silently fail for weekly activity - not critical
+      if (mounted) {
+        setState(() {
+          _weeklyWorkouts = [];
+        });
+      }
+    }
   }
 
   Future<void> _loadUserProfile() async {
@@ -77,9 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppConstants.backgroundColor,
-      body: SafeArea(
-        child: _buildBody(),
-      ),
+      body: SafeArea(child: _buildBody()),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentNavIndex,
         onTap: _onNavTap,
@@ -103,40 +189,43 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeContent() {
     return _isLoading
         ? const Center(
-            child: CircularProgressIndicator(
-              color: AppConstants.primaryColor,
-            ),
+            child: CircularProgressIndicator(color: AppConstants.primaryColor),
           )
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(AppConstants.paddingLarge),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                _buildHeader(),
+        : RefreshIndicator(
+            onRefresh: _refreshData,
+            color: AppConstants.primaryColor,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppConstants.paddingLarge),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  _buildHeader(),
 
-                const SizedBox(height: AppConstants.paddingLarge),
+                  const SizedBox(height: AppConstants.paddingLarge),
 
-                // Stats Cards
-                _buildStatsCards(),
+                  // Stats Cards
+                  _buildStatsCards(),
 
-                const SizedBox(height: AppConstants.paddingLarge),
+                  const SizedBox(height: AppConstants.paddingLarge),
 
-                // Today's Focus
-                _buildTodaysFocus(),
+                  // Today's Focus
+                  _buildTodaysFocus(),
 
-                const SizedBox(height: AppConstants.paddingLarge),
+                  const SizedBox(height: AppConstants.paddingLarge),
 
-                // Weekly Goal
-                _buildWeeklyGoal(),
+                  // Weekly Goal
+                  _buildWeeklyGoal(),
 
-                const SizedBox(height: AppConstants.paddingLarge),
+                  const SizedBox(height: AppConstants.paddingLarge),
 
-                // Activity
-                _buildActivity(),
+                  // Activity
+                  _buildActivity(),
 
-                const SizedBox(height: 80), // Space for bottom nav
-              ],
+                  const SizedBox(height: 80), // Space for bottom nav
+                ],
+              ),
             ),
           );
   }
@@ -204,16 +293,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatsCards() {
+    final totalWorkouts = _dashboardStats?.totalWorkouts ?? 0;
+    final totalMinutes = _dashboardStats?.totalMinutes ?? 0;
+    final currentStreak = _dashboardStats?.currentStreak ?? 0;
+
+    // Calculate hours and minutes
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    final durationText = hours > 0 ? '$hours' : '$minutes';
+    final durationUnit = hours > 0 ? 'hrs' : 'min';
+
     return Row(
       children: [
         Expanded(
           child: StatCard(
-            icon: Icons.local_fire_department_rounded,
+            icon: Icons.fitness_center_rounded,
             iconColor: Colors.orange,
-            label: 'Calories',
-            value: '450',
-            unit: '/ 800 kcal',
-            progress: 0.56,
+            label: 'Workouts',
+            value: '$totalWorkouts',
+            unit: 'total',
+            progress: totalWorkouts > 0
+                ? (totalWorkouts / 100).clamp(0.0, 1.0)
+                : 0.0,
           ),
         ),
         const SizedBox(width: 12),
@@ -222,20 +323,24 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icons.timer_rounded,
             iconColor: Colors.blue,
             label: 'Duration',
-            value: '45',
-            unit: '/ 60 min',
-            progress: 0.75,
+            value: durationText,
+            unit: durationUnit,
+            progress: totalMinutes > 0
+                ? (totalMinutes / 1000).clamp(0.0, 1.0)
+                : 0.0,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: StatCard(
-            icon: Icons.directions_run_rounded,
+            icon: Icons.local_fire_department_rounded,
             iconColor: Colors.green,
-            label: 'Distance',
-            value: '5,2',
-            unit: '/ 10k m',
-            progress: 0.52,
+            label: 'Streak',
+            value: '$currentStreak',
+            unit: 'days',
+            progress: currentStreak > 0
+                ? (currentStreak / 30).clamp(0.0, 1.0)
+                : 0.0,
           ),
         ),
       ],
@@ -357,9 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // TODO: Start workout
-                        },
+                        onPressed: _startTodayWorkout,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.primaryColor,
                           shape: RoundedRectangleBorder(
@@ -402,6 +505,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWeeklyGoal() {
+    final weeklyWorkoutCount = _weeklyWorkouts.length;
+    const weeklyGoal = 4; // Target: 4 workouts per week
+    final progress = (weeklyWorkoutCount / weeklyGoal).clamp(0.0, 1.0);
+    final percentage = (progress * 100).toInt();
+
     return Container(
       padding: const EdgeInsets.all(AppConstants.paddingMedium),
       decoration: BoxDecoration(
@@ -424,8 +532,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Text(
-                '75%',
-                style: TextStyle(
+                '$percentage%',
+                style: const TextStyle(
                   color: AppConstants.primaryColor,
                   fontSize: AppConstants.fontSizeLarge,
                   fontWeight: FontWeight.bold,
@@ -439,7 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: 0.75,
+              value: progress,
               backgroundColor: AppConstants.borderColor,
               valueColor: const AlwaysStoppedAnimation<Color>(
                 AppConstants.primaryColor,
@@ -450,9 +558,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
           const SizedBox(height: 8),
 
-          const Text(
-            '3 of 4 workouts completed this week',
-            style: TextStyle(
+          Text(
+            '$weeklyWorkoutCount of $weeklyGoal workouts completed this week',
+            style: const TextStyle(
               color: AppConstants.textSecondaryColor,
               fontSize: AppConstants.fontSizeSmall,
             ),
@@ -463,42 +571,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActivity() {
+    // Count workouts by day of week (0 = Monday, 6 = Sunday)
+    final workoutsByDay = List<int>.filled(7, 0);
+    for (var workout in _weeklyWorkouts) {
+      final dayIndex = workout.dayOfWeek;
+      if (dayIndex >= 0 && dayIndex < 7) {
+        workoutsByDay[dayIndex]++;
+      }
+    }
+
+    // Find max for scaling
+    final maxWorkouts = workoutsByDay.reduce((a, b) => a > b ? a : b);
+    final totalWorkouts = _weeklyWorkouts.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Activity',
-              style: TextStyle(
-                color: AppConstants.textPrimaryColor,
-                fontSize: AppConstants.fontSizeLarge,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  color: AppConstants.textSecondaryColor,
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  color: AppConstants.textSecondaryColor,
-                  onPressed: () {},
-                ),
-              ],
-            ),
-          ],
+        const Text(
+          'Activity',
+          style: TextStyle(
+            color: AppConstants.textPrimaryColor,
+            fontSize: AppConstants.fontSizeLarge,
+            fontWeight: FontWeight.bold,
+          ),
         ),
 
         const SizedBox(height: 8),
 
-        const Text(
-          '4 Workouts',
-          style: TextStyle(
+        Text(
+          '$totalWorkouts Workout${totalWorkouts != 1 ? 's' : ''}',
+          style: const TextStyle(
             color: AppConstants.textPrimaryColor,
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -522,13 +624,13 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildBar('MON', 0.0),
-              _buildBar('TUE', 0.6),
-              _buildBar('WED', 0.0),
-              _buildBar('THU', 0.9),
-              _buildBar('FRI', 0.0),
-              _buildBar('SAT', 0.7),
-              _buildBar('SUN', 0.0),
+              _buildBar('MON', workoutsByDay[0], maxWorkouts),
+              _buildBar('TUE', workoutsByDay[1], maxWorkouts),
+              _buildBar('WED', workoutsByDay[2], maxWorkouts),
+              _buildBar('THU', workoutsByDay[3], maxWorkouts),
+              _buildBar('FRI', workoutsByDay[4], maxWorkouts),
+              _buildBar('SAT', workoutsByDay[5], maxWorkouts),
+              _buildBar('SUN', workoutsByDay[6], maxWorkouts),
             ],
           ),
         ),
@@ -536,21 +638,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildBar(String day, double value) {
+  Widget _buildBar(String day, int workoutCount, int maxWorkouts) {
+    // Calculate height as percentage of max (with minimum height for visibility)
+    final double heightRatio = maxWorkouts > 0
+        ? workoutCount / maxWorkouts
+        : 0.0;
+    final double barHeight = heightRatio > 0
+        ? (100 * heightRatio).clamp(20.0, 100.0)
+        : 0.0;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        // Workout count label
+        if (workoutCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              '$workoutCount',
+              style: const TextStyle(
+                color: AppConstants.primaryColor,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          )
+        else
+          const SizedBox(height: 16),
+        // Bar
         Container(
           width: 32,
-          height: 100 * value,
+          height: barHeight,
           decoration: BoxDecoration(
-            color: value > 0
+            color: workoutCount > 0
                 ? AppConstants.primaryColor
                 : AppConstants.borderColor,
             borderRadius: BorderRadius.circular(6),
           ),
         ),
         const SizedBox(height: 8),
+        // Day label
         Text(
           day,
           style: const TextStyle(
@@ -560,5 +687,92 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _startTodayWorkout() async {
+    try {
+      // Get user's active plans
+      final plans = await WorkoutPlanService.getMyPlans();
+
+      if (plans.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No active workout plan found. Create a plan first!',
+              ),
+              backgroundColor: AppConstants.errorColor,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get the first plan's details with schedules
+      final plan = await WorkoutPlanService.getPlanDetail(plans.first.planId);
+
+      // Find today's schedule
+      final today = _getCurrentDay();
+      final todaySchedule = plan.schedules?.firstWhere(
+        (s) => s.dayOfWeek.toUpperCase() == today,
+        orElse: () => throw Exception('No schedule found'),
+      );
+
+      if (todaySchedule == null || todaySchedule.exercises.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No workout scheduled for today. It\'s a rest day!',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Navigate to workout session
+      if (mounted) {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WorkoutSessionScreen(
+              schedule: todaySchedule,
+              planScheduleId: todaySchedule.scheduleId,
+            ),
+          ),
+        );
+
+        // Refresh data if workout was completed
+        if (result == true && mounted) {
+          _refreshData();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+            backgroundColor: AppConstants.errorColor,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getCurrentDay() {
+    final now = DateTime.now();
+    const days = [
+      'MONDAY',
+      'TUESDAY',
+      'WEDNESDAY',
+      'THURSDAY',
+      'FRIDAY',
+      'SATURDAY',
+      'SUNDAY',
+    ];
+    return days[now.weekday - 1];
   }
 }

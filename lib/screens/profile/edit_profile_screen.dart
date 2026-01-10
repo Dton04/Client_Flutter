@@ -26,7 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = false;
   bool _isUploading = false;
 
-  final List<String> _genderOptions = ['Male', 'Female', 'Other'];
+  final List<String> _genderOptions = ['MALE', 'FEMALE', 'OTHER'];
   final List<String> _fitnessGoalOptions = [
     'Muscle Gain',
     'Weight Loss',
@@ -390,9 +390,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                       items: _genderOptions.map((gender) {
+                        // Map backend values to display labels
+                        String displayLabel = gender;
+                        switch (gender) {
+                          case 'MALE':
+                            displayLabel = 'Nam';
+                            break;
+                          case 'FEMALE':
+                            displayLabel = 'Nữ';
+                            break;
+                          case 'OTHER':
+                            displayLabel = 'Khác';
+                            break;
+                        }
                         return DropdownMenuItem(
                           value: gender,
-                          child: Text(gender),
+                          child: Text(displayLabel),
                         );
                       }).toList(),
                       onChanged: (value) {

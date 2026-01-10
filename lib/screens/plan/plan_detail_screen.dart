@@ -6,6 +6,7 @@ import '../../models/workout_plan_model.dart';
 import '../../models/plan_schedule_model.dart';
 import '../../models/plan_exercise_model.dart';
 import '../exercise/exercise_detail_screen.dart';
+import '../workout/workout_session_screen.dart';
 
 class PlanDetailScreen extends StatefulWidget {
   final int planId;
@@ -40,9 +41,9 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
     }
   }
 
@@ -59,38 +60,45 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _plan == null
-              ? const Center(child: Text('Plan not found', style: TextStyle(color: Colors.white)))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Plan Header Info
-                      _buildPlanHeader(),
-                      const SizedBox(height: 24),
-                      
-                      // Schedules
-                      const Text(
-                        'Lịch tập luyện',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (_plan!.schedules == null || _plan!.schedules!.isEmpty)
-                        const Center(
-                          child: Text(
-                            'Chưa có lịch tập nào',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        )
-                      else
-                        ..._plan!.schedules!.map((schedule) => _buildScheduleCard(schedule)),
-                    ],
+          ? const Center(
+              child: Text(
+                'Plan not found',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(AppConstants.paddingMedium),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Plan Header Info
+                  _buildPlanHeader(),
+                  const SizedBox(height: 24),
+
+                  // Schedules
+                  const Text(
+                    'Lịch tập luyện',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  if (_plan!.schedules == null || _plan!.schedules!.isEmpty)
+                    const Center(
+                      child: Text(
+                        'Chưa có lịch tập nào',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  else
+                    ..._plan!.schedules!.map(
+                      (schedule) => _buildScheduleCard(schedule),
+                    ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -106,7 +114,11 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.calendar_today, color: AppConstants.primaryColor, size: 20),
+              const Icon(
+                Icons.calendar_today,
+                color: AppConstants.primaryColor,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
                 '${_formatDate(_plan!.startDate)} - ${_formatDate(_plan!.endDate)}',
@@ -152,14 +164,21 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
               if (isToday) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'TODAY',
-                    style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -173,14 +192,45 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
             if (schedule.exercises.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('Ngày nghỉ (Rest Day)', style: TextStyle(color: Colors.grey)),
+                child: Text(
+                  'Ngày nghỉ (Rest Day)',
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Column(
-                  children: schedule.exercises.map((ex) => _buildExerciseItem(ex)).toList(),
-                ),
+              Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      children: schedule.exercises
+                          .map((ex) => _buildExerciseItem(ex))
+                          .toList(),
+                    ),
+                  ),
+                  // Start Workout button for today
+                  if (isToday && schedule.exercises.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _startWorkout(schedule),
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Start Workout'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
           ],
         ),
@@ -258,10 +308,7 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
       ),
       child: Text(
         text,
-        style: const TextStyle(
-          color: AppConstants.primaryColor,
-          fontSize: 10,
-        ),
+        style: const TextStyle(color: AppConstants.primaryColor, fontSize: 10),
       ),
     );
   }
@@ -271,9 +318,34 @@ class _PlanDetailScreenState extends State<PlanDetailScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  void _startWorkout(PlanScheduleModel schedule) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutSessionScreen(
+          schedule: schedule,
+          planScheduleId: schedule.scheduleId,
+        ),
+      ),
+    ).then((result) {
+      // Refresh if workout was completed
+      if (result == true) {
+        _loadPlanDetail();
+      }
+    });
+  }
+
   String _getCurrentDay() {
     final now = DateTime.now();
-    const days = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    const days = [
+      'MONDAY',
+      'TUESDAY',
+      'WEDNESDAY',
+      'THURSDAY',
+      'FRIDAY',
+      'SATURDAY',
+      'SUNDAY',
+    ];
     return days[now.weekday - 1];
   }
 }
