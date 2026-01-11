@@ -46,7 +46,9 @@ class WorkoutSessionModel {
   }
 
   int get durationMinutes {
-    return duration.inMinutes;
+    // Ensure at least 1 minute to satisfy backend validation
+    final minutes = duration.inMinutes;
+    return minutes > 0 ? minutes : 1;
   }
 
   bool get isComplete {

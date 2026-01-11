@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/user_profile_model.dart';
 import '../../models/dashboard_stats_model.dart';
 import '../../models/workout_history_model.dart';
+import '../../models/workout_plan_model.dart';
+import '../../models/plan_schedule_model.dart';
 import '../../services/profile_service.dart';
 import '../../services/tracking_service.dart';
 import '../../services/workout_plan_service.dart';
@@ -26,8 +28,12 @@ class _HomeScreenState extends State<HomeScreen> {
   UserProfileModel? _userProfile;
   DashboardStatsModel? _dashboardStats;
   List<WorkoutHistoryModel> _weeklyWorkouts = [];
+  WorkoutPlanModel? _todayPlan;
+  PlanScheduleModel? _todaySchedule;
+  bool _isTodayWorkoutCompleted = false;
   bool _isLoading = true;
   bool _isRefreshing = false;
+  String? _todayWorkoutError;
 
   @override
   void initState() {
@@ -40,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadUserProfile(),
       _loadDashboardData(),
       _loadWeeklyActivity(),
+      _loadTodayWorkout(),
     ]);
   }
 
@@ -105,11 +112,73 @@ class _HomeScreenState extends State<HomeScreen> {
           _weeklyWorkouts = weeklyWorkouts;
         });
       }
+
+      // Debug logging
+      print(
+        '📊 Loaded ${workouts.length} total workouts for ${now.month}/${now.year}',
+      );
+      print(
+        '📊 Filtered to ${weeklyWorkouts.length} workouts for current week',
+      );
     } catch (e) {
-      // Silently fail for weekly activity - not critical
+      // Log error for debugging
+      print('❌ Error loading weekly activity: $e');
+
       if (mounted) {
         setState(() {
           _weeklyWorkouts = [];
+        });
+      }
+    }
+  }
+
+  Future<void> _loadTodayWorkout() async {
+    try {
+      // Get user's active plans
+      final plans = await WorkoutPlanService.getMyPlans();
+
+      if (plans.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _todayWorkoutError =
+                'No active workout plan. Create one to get started!';
+          });
+        }
+        return;
+      }
+
+      // Get the first active plan's details with schedules
+      final plan = await WorkoutPlanService.getPlanDetail(plans.first.planId);
+
+      // Find today's schedule
+      final today = _getCurrentDay();
+      final todaySchedule = plan.schedules?.firstWhere(
+        (s) => s.dayOfWeek.toUpperCase() == today,
+        orElse: () => throw Exception('No schedule'),
+      );
+
+      // Check if today's workout has been completed
+      final todayDate = DateTime.now();
+      final hasCompletedToday = _weeklyWorkouts.any((workout) {
+        return workout.performedAt.year == todayDate.year &&
+            workout.performedAt.month == todayDate.month &&
+            workout.performedAt.day == todayDate.day;
+      });
+
+      if (mounted) {
+        setState(() {
+          _todayPlan = plan;
+          _todaySchedule = todaySchedule;
+          _isTodayWorkoutCompleted = hasCompletedToday;
+          _todayWorkoutError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _todayWorkoutError = e.toString().contains('No schedule')
+              ? 'Rest day! No workout scheduled for today.'
+              : 'Unable to load today\'s workout';
         });
       }
     }
@@ -363,127 +432,209 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: 12),
 
-        Container(
-          decoration: BoxDecoration(
-            color: AppConstants.cardColor,
-            borderRadius: BorderRadius.circular(
-              AppConstants.borderRadiusMedium,
+        // Show error message if there's an error
+        if (_todayWorkoutError != null)
+          Container(
+            padding: const EdgeInsets.all(AppConstants.paddingLarge),
+            decoration: BoxDecoration(
+              color: AppConstants.cardColor,
+              borderRadius: BorderRadius.circular(
+                AppConstants.borderRadiusMedium,
+              ),
+              border: Border.all(color: AppConstants.borderColor, width: 1),
             ),
-            border: Border.all(color: AppConstants.borderColor, width: 1),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Workout Image
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppConstants.borderRadiusMedium),
+            child: Column(
+              children: [
+                Icon(
+                  _todayWorkoutError!.contains('Rest day')
+                      ? Icons.spa_outlined
+                      : Icons.fitness_center_outlined,
+                  size: 48,
+                  color: AppConstants.textSecondaryColor,
                 ),
-                child: Container(
-                  height: 200,
-                  width: double.infinity,
-                  color: AppConstants.surfaceColor,
-                  child: const Icon(
-                    Icons.fitness_center,
-                    size: 80,
+                const SizedBox(height: 12),
+                Text(
+                  _todayWorkoutError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
                     color: AppConstants.textSecondaryColor,
+                    fontSize: AppConstants.fontSizeMedium,
                   ),
                 ),
+                if (!_todayWorkoutError!.contains('Rest day')) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CreatePlanScreen(),
+                          ),
+                        ).then((_) => _refreshData());
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Create Plan'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          )
+        else if (_todaySchedule != null && _todayPlan != null)
+          Container(
+            decoration: BoxDecoration(
+              color: AppConstants.cardColor,
+              borderRadius: BorderRadius.circular(
+                AppConstants.borderRadiusMedium,
               ),
+              border: Border.all(color: AppConstants.borderColor, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Workout Image
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppConstants.borderRadiusMedium),
+                  ),
+                  child: Container(
+                    height: 200,
+                    width: double.infinity,
+                    color: AppConstants.surfaceColor,
+                    child: const Icon(
+                      Icons.fitness_center,
+                      size: 80,
+                      color: AppConstants.textSecondaryColor,
+                    ),
+                  ),
+                ),
 
-              Padding(
-                padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Category badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                Padding(
+                  padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Category badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _todaySchedule!.dayOfWeek.toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: AppConstants.primaryColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'STRENGTH',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
+
+                      const SizedBox(height: 12),
+
+                      // Title
+                      Text(
+                        _todaySchedule!.title,
+                        style: const TextStyle(
+                          color: AppConstants.textPrimaryColor,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 4),
 
-                    // Title
-                    const Text(
-                      'Leg Day Crush',
-                      style: TextStyle(
-                        color: AppConstants.textPrimaryColor,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Description
-                    const Text(
-                      'Build power and endurance',
-                      style: TextStyle(
-                        color: AppConstants.textSecondaryColor,
-                        fontSize: AppConstants.fontSizeMedium,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Stats
-                    Row(
-                      children: [
-                        _buildWorkoutStat(Icons.timer_rounded, '45 min'),
-                        const SizedBox(width: 16),
-                        _buildWorkoutStat(Icons.fitness_center, '6 Exercises'),
-                        const SizedBox(width: 16),
-                        _buildWorkoutStat(
-                          Icons.local_fire_department_rounded,
-                          '420 Kcal',
+                      // Description
+                      Text(
+                        _todayPlan!.planName,
+                        style: const TextStyle(
+                          color: AppConstants.textSecondaryColor,
+                          fontSize: AppConstants.fontSizeMedium,
                         ),
-                      ],
-                    ),
+                      ),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // Start button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _startTodayWorkout,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.primaryColor,
-                          shape: RoundedRectangleBorder(
+                      // Stats
+                      Row(
+                        children: [
+                          _buildWorkoutStat(
+                            Icons.fitness_center,
+                            '${_todaySchedule!.exercises.length} Exercises',
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Completion status or Start button
+                      if (_isTodayWorkoutCompleted)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green, width: 2),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 24,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Completed Today!',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: AppConstants.fontSizeLarge,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _startTodayWorkout,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppConstants.primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Start Workout',
+                              style: TextStyle(
+                                fontSize: AppConstants.fontSizeLarge,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
-                        child: const Text(
-                          'Start Workout',
-                          style: TextStyle(
-                            fontSize: AppConstants.fontSizeLarge,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -690,74 +841,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startTodayWorkout() async {
-    try {
-      // Get user's active plans
-      final plans = await WorkoutPlanService.getMyPlans();
-
-      if (plans.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'No active workout plan found. Create a plan first!',
-              ),
-              backgroundColor: AppConstants.errorColor,
-            ),
-          );
-        }
-        return;
-      }
-
-      // Get the first plan's details with schedules
-      final plan = await WorkoutPlanService.getPlanDetail(plans.first.planId);
-
-      // Find today's schedule
-      final today = _getCurrentDay();
-      final todaySchedule = plan.schedules?.firstWhere(
-        (s) => s.dayOfWeek.toUpperCase() == today,
-        orElse: () => throw Exception('No schedule found'),
-      );
-
-      if (todaySchedule == null || todaySchedule.exercises.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'No workout scheduled for today. It\'s a rest day!',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Navigate to workout session
-      if (mounted) {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => WorkoutSessionScreen(
-              schedule: todaySchedule,
-              planScheduleId: todaySchedule.scheduleId,
-            ),
-          ),
-        );
-
-        // Refresh data if workout was completed
-        if (result == true && mounted) {
-          _refreshData();
-        }
-      }
-    } catch (e) {
+    // Check if we have today's schedule loaded
+    if (_todaySchedule == null || _todayPlan == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Error: ${e.toString().replaceAll('Exception: ', '')}',
+              _todayWorkoutError ?? 'No workout scheduled for today',
             ),
             backgroundColor: AppConstants.errorColor,
           ),
         );
+      }
+      return;
+    }
+
+    // Navigate to workout session with the loaded schedule
+    if (mounted) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WorkoutSessionScreen(
+            schedule: _todaySchedule!,
+            planScheduleId: _todaySchedule!.scheduleId,
+          ),
+        ),
+      );
+
+      // Refresh data if workout was completed
+      if (result == true && mounted) {
+        _refreshData();
       }
     }
   }
