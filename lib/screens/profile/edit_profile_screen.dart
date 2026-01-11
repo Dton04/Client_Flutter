@@ -40,7 +40,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _fullNameController.text = widget.userProfile.fullName;
     _selectedGender = widget.userProfile.gender;
-    _selectedFitnessGoal = widget.userProfile.fitnessGoal;
+
+    // Only set fitness goal if it exists in the options list
+    if (_fitnessGoalOptions.contains(widget.userProfile.fitnessGoal)) {
+      _selectedFitnessGoal = widget.userProfile.fitnessGoal;
+    } else {
+      // If the value from backend doesn't match, set to null
+      _selectedFitnessGoal = null;
+    }
+
     _avatarUrl = widget.userProfile.avatarUrl;
   }
 

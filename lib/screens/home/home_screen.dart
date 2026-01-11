@@ -112,14 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _weeklyWorkouts = weeklyWorkouts;
         });
       }
-
-      // Debug logging
-      print(
-        '📊 Loaded ${workouts.length} total workouts for ${now.month}/${now.year}',
-      );
-      print(
-        '📊 Filtered to ${weeklyWorkouts.length} workouts for current week',
-      );
     } catch (e) {
       // Log error for debugging
       print('❌ Error loading weekly activity: $e');
@@ -234,6 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppConstants.backgroundColor,
+      resizeToAvoidBottomInset: false, // Prevent overflow when keyboard appears
       body: SafeArea(child: _buildBody()),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentNavIndex,
