@@ -94,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
         year: now.year,
       );
 
-      // Filter to current week only
       final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
       final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
@@ -113,9 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      // Log error for debugging
-      print('❌ Error loading weekly activity: $e');
-
       if (mounted) {
         setState(() {
           _weeklyWorkouts = [];
@@ -126,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTodayWorkout() async {
     try {
-      // Get user's active plans
       final plans = await WorkoutPlanService.getMyPlans();
 
       if (plans.isEmpty) {
@@ -139,17 +134,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Get the first active plan's details with schedules
       final plan = await WorkoutPlanService.getPlanDetail(plans.first.planId);
 
-      // Find today's schedule
       final today = _getCurrentDay();
       final todaySchedule = plan.schedules?.firstWhere(
         (s) => s.dayOfWeek.toUpperCase() == today,
         orElse: () => throw Exception('No schedule'),
       );
 
-      // Check if today's workout has been completed
       final todayDate = DateTime.now();
       final hasCompletedToday = _weeklyWorkouts.any((workout) {
         return workout.performedAt.year == todayDate.year &&
