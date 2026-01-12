@@ -22,11 +22,7 @@ class PlanExerciseModel {
       planExerciseId: json['plan_exercise_id'] is int ? json['plan_exercise_id'] : int.tryParse(json['plan_exercise_id']?.toString() ?? '0') ?? 0,
       exerciseId: json['exercise_id'] is int ? json['exercise_id'] : int.tryParse(json['exercise_id']?.toString() ?? '0') ?? 0,
       exerciseName: json['name']?.toString() ?? json['exercise_name']?.toString(), 
-      exerciseImageUrl: json['image_url']?.toString() ?? 
-                        json['thumbnail']?.toString() ?? 
-                        json['thumbnail_url']?.toString() ?? 
-                        json['image']?.toString() ?? 
-                        json['url']?.toString(),
+      exerciseImageUrl: json['url']?.toString(),
       targetSets: json['target_sets'] is int ? json['target_sets'] : int.tryParse(json['target_sets']?.toString() ?? '0') ?? 0,
       targetReps: json['target_reps'] is int ? json['target_reps'] : int.tryParse(json['target_reps']?.toString() ?? '0') ?? 0,
       targetRestTime: json['target_rest_time'] is int ? json['target_rest_time'] : int.tryParse(json['target_rest_time']?.toString() ?? '0') ?? 0,
